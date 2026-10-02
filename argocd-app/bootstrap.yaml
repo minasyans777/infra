@@ -10,9 +10,9 @@ spec:
   source:
     repoURL: https://github.com/minasyans777/infra.git
     targetRevision: HEAD
-    path: apps
+    path: argocd-app/apps
   destination:
-    server: 'https://default.svc'
+    server: https://kubernetes.default.svc
     namespace: argocd
   syncPolicy:
     automated:
