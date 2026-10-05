@@ -15,7 +15,6 @@ spec:
           dataStorage:
             enabled: true
             size: 10Gi
-
   destination:
     server: https://kubernetes.default.svc
     namespace: vault
@@ -24,3 +23,10 @@ spec:
       prune: true
     syncOptions:
       - CreateNamespace=true
+
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jsonPointers:
+        - /webhooks/0/clientConfig/caBundle
+        - /webhooks/1/clientConfig/caBundle
