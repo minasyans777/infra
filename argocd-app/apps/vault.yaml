@@ -15,6 +15,28 @@ spec:
           dataStorage:
             enabled: true
             size: 10Gi
+          
+          extraVolumes:
+            - name: vault-tls
+              type: secret
+              parameters:
+                secretName: vault-tls-secret
+
+          standalone:
+            config: |
+              ui = true
+
+              listener "tcp" {
+                tls_disable = 0
+                address     = "[::]:8200"
+                cluster_address = "[::]:8201"
+                tls_cert_file = "/vault/userconfig/vault-tls/tls.crt"
+                tls_key_file  = "/vault/userconfig/vault-tls/tls.key"
+              }
+
+              storage "file" {
+                path = "/vault/data"
+              }
   destination:
     server: https://kubernetes.default.svc
     namespace: vault
@@ -23,10 +45,10 @@ spec:
       prune: true
     syncOptions:
       - CreateNamespace=true
-
   ignoreDifferences:
     - group: admissionregistration.k8s.io
       kind: MutatingWebhookConfiguration
       jsonPointers:
         - /webhooks/0/clientConfig/caBundle
         - /webhooks/1/clientConfig/caBundle
+
