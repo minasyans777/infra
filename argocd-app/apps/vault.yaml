@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://helm.releases.hashicorp.com
+    repoURL: https://hashicorp.com
     chart: vault
     targetRevision: 0.34.1
     helm:
@@ -15,30 +15,31 @@ spec:
           dataStorage:
             enabled: true
             size: 10Gi
-          
-          extraVolumes:
-            - name: vault-tls
-              type: secret
-              parameters:
-                secretName: vault-tls-secret
 
-          standalone:
-            config: |
-              ui = true
+          # 1. Միացնում ենք TLS աջակցությունը Helm Chart-ի մակարդակով
+          tls:
+            enabled: true
+            # Նշում ենք այն Secret-ի անունը, որը ստեղծել էիք (tls.crt և tls.key)
+            secretName: vault-tls-secret
 
-              listener "tcp" {
-                tls_disable = 0
-                address     = "[::]:8200"
-                cluster_address = "[::]:8201"
-                tls_cert_file = "/vault/userconfig/vault-tls/tls.crt"
-                tls_key_file  = "/vault/userconfig/vault-tls/tls.key"
-              }
+          # 2. Փոխում ենք ներքին Vault-ի կոնֆիգուրացիան extraConfig-ի միջոցով
+          extraConfig: |
+            ui = true
 
-              storage "file" {
-                path = "/vault/data"
-              }
+            listener "tcp" {
+              address     = "[::]:8200"
+              cluster_address = "[::]:8201"
+              tls_disable = 0
+              # Helm chart-ը ավտոմատ մաունթ է անում սեկրետը այս հասցեով.
+              tls_cert_file = "/vault/userconfig/vault-tls-secret/tls.crt"
+              tls_key_file  = "/vault/userconfig/vault-tls-secret/tls.key"
+            }
+
+            storage "file" {
+              path = "/vault/data"
+            }
   destination:
-    server: https://kubernetes.default.svc
+    server: https://default.svc
     namespace: vault
   syncPolicy:
     automated:
