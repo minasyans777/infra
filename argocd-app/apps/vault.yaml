@@ -16,13 +16,10 @@ spec:
             enabled: true
             size: 10Gi
 
-          # 1. Միացնում ենք TLS աջակցությունը Helm Chart-ի մակարդակով
           tls:
             enabled: true
-            # Նշում ենք այն Secret-ի անունը, որը ստեղծել էիք (tls.crt և tls.key)
             secretName: vault-tls-secret
 
-          # 2. Փոխում ենք ներքին Vault-ի կոնֆիգուրացիան extraConfig-ի միջոցով
           extraConfig: |
             ui = true
 
@@ -30,7 +27,6 @@ spec:
               address     = "[::]:8200"
               cluster_address = "[::]:8201"
               tls_disable = 0
-              # Helm chart-ը ավտոմատ մաունթ է անում սեկրետը այս հասցեով.
               tls_cert_file = "/vault/userconfig/vault-tls-secret/tls.crt"
               tls_key_file  = "/vault/userconfig/vault-tls-secret/tls.key"
             }
@@ -39,7 +35,7 @@ spec:
               path = "/vault/data"
             }
   destination:
-    server: https://default.svc
+    server: https://kubernetes.default.svc
     namespace: vault
   syncPolicy:
     automated:
