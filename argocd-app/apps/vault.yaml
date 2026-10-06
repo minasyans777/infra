@@ -10,26 +10,28 @@ spec:
     chart: vault
     targetRevision: 0.34.1
     helm:
-      values: |
+      # Հանում ենք "|" նշանը և արժեքները փոխանցում որպես մաքուր YAML օբյեկտ
+      values:
         server:
           dataStorage:
             enabled: true
             size: 10Gi
 
-          # 1. Ճիշտ կերպով սահմանում ենք Volume Mount-ը Pod-ի ներսում
+          # 1. Volume Mount-ը Pod-ի ներսում
           extraVolumeMounts:
             - name: vault-tls-volume
               mountPath: /vault/userconfig/vault-tls
               readOnly: true
 
-          # 2. Ճիշտ կերպով կապում ենք Kubernetes Secret-ը որպես Volume
+          # 2. Kubernetes Secret-ը որպես Volume
           extraVolumes:
             - name: vault-tls-volume
               secret:
-                secretName: vault-tls-secret # Ձեր cert-manager Secret-ի անունը
+                secretName: vault-tls-secret
 
           # 3. Configure Vault TCP listener
           standalone:
+            enabled: true
             config: |
               listener "tcp" {
                 address     = "0.0.0.0:8200"
