@@ -10,45 +10,11 @@ spec:
     chart: vault
     targetRevision: 0.34.1
     helm:
-      # Հանում ենք "|" նշանը և արժեքները փոխանցում որպես մաքուր YAML օբյեկտ
-      values:
+      values: |
         server:
           dataStorage:
             enabled: true
             size: 10Gi
-
-          # 1. Volume Mount-ը Pod-ի ներսում
-          extraVolumeMounts:
-            - name: vault-tls-volume
-              mountPath: /vault/userconfig/vault-tls
-              readOnly: true
-
-          # 2. Kubernetes Secret-ը որպես Volume
-          extraVolumes:
-            - name: vault-tls-volume
-              secret:
-                secretName: vault-tls-secret
-
-          # 3. Configure Vault TCP listener
-          standalone:
-            enabled: true
-            config: |
-              listener "tcp" {
-                address     = "0.0.0.0:8200"
-                tls_cert_file = "/vault/userconfig/vault-tls/tls.crt"
-                tls_key_file  = "/vault/userconfig/vault-tls/tls.key"
-              }
-              storage "file" {
-                path = "/vault/data"
-              }
-              disable_mlock = true
-
-          # 4. Change probe schemes to HTTPS
-          readinessProbe:
-            scheme: HTTPS
-          livenessProbe:
-            scheme: HTTPS
-            initialDelaySeconds: 60
   destination:
     server: https://kubernetes.default.svc
     namespace: vault
@@ -64,4 +30,3 @@ spec:
       jsonPointers:
         - /webhooks/0/clientConfig/caBundle
         - /webhooks/1/clientConfig/caBundle
-
