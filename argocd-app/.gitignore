@@ -1,0 +1,2 @@
+# Vault initialization material belongs only in the local checkout.
+/apps/vault/vault-cluster-vault-*.json

@@ -1,0 +1,46 @@
+# Single certificate shared by all 3 Vault pods (mounted read-only into every
+# pod by the Helm chart's `server.extraVolumes`, see ../helm/values/vault.yaml).
+# SANs cover every name a pod or client might dial:
+#   - the 3 StatefulSet pods, addressed via the headless "vault-internal" service
+#     (used for Raft peer-to-peer traffic)
+#   - the "vault", "vault-active", "vault-standby" ClusterIP services
+#     (used by clients: ESO, registration CI port-forward, terraform)
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: vault-server-tls
+  namespace: vault
+spec:
+  secretName: vault-server-tls
+  duration: 2160h   # 90d
+  renewBefore: 360h # 15d — Vault does not hot-reload TLS certs, see ../documentation/tls.md
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  dnsNames:
+    - localhost
+    - vault
+    - vault.vault
+    - vault.vault.svc
+    - vault.vault.svc.cluster.local
+    - vault-active
+    - vault-active.vault
+    - vault-active.vault.svc
+    - vault-active.vault.svc.cluster.local
+    - vault-standby
+    - vault-standby.vault
+    - vault-standby.vault.svc
+    - vault-standby.vault.svc.cluster.local
+    - vault-internal
+    - "*.vault-internal"
+    - "*.vault-internal.vault.svc"
+    - "*.vault-internal.vault.svc.cluster.local"
+    - vault-0.vault-internal
+    - vault-1.vault-internal
+    - vault-2.vault-internal
+  ipAddresses:
+    - 127.0.0.1
+  issuerRef:
+    name: vault-ca-issuer
+    kind: Issuer
+    group: cert-manager.io

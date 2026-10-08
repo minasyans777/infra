@@ -1,0 +1,167 @@
+# Values for hashicorp/vault (vault-helm chart 0.34.0 / Vault 2.0.3 — verify against
+# https://github.com/hashicorp/vault-helm/releases before upgrading).
+#
+# Raft HA, TLS-only, Shamir-sealed (see ../../documentation/bootstrap-and-unseal.md
+# for why not auto-unseal), ClusterIP-only (no Ingress — Vault's API is reached via
+# `kubectl port-forward`, same pattern the registration repo's CI already uses; see
+# ../../README.md).
+#
+# `server.ha.replicas` is currently 1 (single production node today). Raft supports
+# adding voters online with no data migration, so growing to the real 3-node target
+# (1 control-plane + 2 workers) later is a one-line change — see
+# ../../documentation/scaling-to-ha.md.
+
+global:
+  enabled: true
+  tlsDisable: false   # master switch: makes the chart use https:// for probes, VAULT_ADDR, etc.
+
+injector:
+  enabled: false   # this architecture uses External Secrets Operator, not the Vault Agent Injector
+
+csi:
+  enabled: false
+
+server:
+  image:
+    repository: hashicorp/vault
+    tag: "2.0.3"
+
+  serviceAccount:
+    create: true
+    name: vault
+
+  # One Vault pod per node — a no-op today (replicas: 1, nothing to be anti-affine
+  # with), takes effect automatically once replicas is raised to 3. See
+  # documentation/scaling-to-ha.md.
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+              app.kubernetes.io/instance: vault
+              component: server
+          topologyKey: kubernetes.io/hostname
+
+  # The future control-plane node is meant to also run Vault (a 1-CP+2-worker
+  # cluster can't get 3 real anti-affine nodes otherwise) — tolerate the taints
+  # kubeadm/RKE2 apply to control-plane nodes by default. Harmless no-ops on a
+  # cluster that doesn't set these (e.g. default k3s server nodes, or today's
+  # single untainted node) or on a tool that uses a different taint key; adjust to
+  # match yours if so. See documentation/scaling-to-ha.md.
+  tolerations: |
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      effect: NoSchedule
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+  # Raft storage: each pod's own PVC under /vault/data.
+  dataStorage:
+    enabled: true
+    size: 10Gi
+    # storageClass intentionally unset — uses the cluster's default StorageClass,
+    # same convention as gitops' cnpg-cluster.yaml / minio (see gitops/documentation).
+    accessMode: ReadWriteOnce
+
+  # Audit log storage — not enabled by `vault audit enable` automatically, but the
+  # volume exists so that can be turned on post-bootstrap without a redeploy.
+  auditStorage:
+    enabled: true
+    size: 5Gi
+    accessMode: ReadWriteOnce
+
+  extraVolumes:
+    - type: secret
+      name: vault-server-tls   # issued by tls/20-server-certificate.yaml, mounted at
+                                # /vault/userconfig/vault-server-tls/{tls.crt,tls.key,ca.crt}
+
+  extraEnvironmentVars:
+    VAULT_CACERT: /vault/userconfig/vault-server-tls/ca.crt
+
+  readinessProbe:
+    enabled: true
+    path: "/v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204"
+  livenessProbe:
+    enabled: true
+    # sealedcode=204/uninitcode=204 matches readinessProbe above: a sealed or
+    # uninitialized Vault must not be killed by the liveness probe. Without
+    # this, this endpoint returns a failure status while sealed, and since
+    # this cluster uses manual Shamir unseal (no auto-unseal/KMS), the pod
+    # would be killed by Kubernetes before a human can enter the unseal keys
+    # after every restart -- a crash loop that blocks unsealing entirely.
+    # (A prior live-patched failureThreshold/initialDelaySeconds workaround
+    # for this was never committed here and was lost on the last helm upgrade.)
+    path: "/v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204"
+    initialDelaySeconds: 60
+    failureThreshold: 30
+
+  ha:
+    enabled: true
+    replicas: 1   # bump to 3 once the 2 worker nodes exist — see documentation/scaling-to-ha.md
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        ui = true
+
+        listener "tcp" {
+          address            = "[::]:8200"
+          cluster_address    = "[::]:8201"
+          tls_cert_file      = "/vault/userconfig/vault-server-tls/tls.crt"
+          tls_key_file       = "/vault/userconfig/vault-server-tls/tls.key"
+          tls_client_ca_file = "/vault/userconfig/vault-server-tls/ca.crt"
+        }
+
+        storage "raft" {
+          path = "/vault/data"
+
+          # All 3 listed up front even though only vault-0 exists today (replicas:
+          # 1 above) — vault-1/vault-2 just log harmless "unreachable" retries until
+          # they're real. Means growing to 3 nodes later needs no edit here, just
+          # `replicas: 3` + a helmfile apply.
+          retry_join {
+            leader_api_addr     = "https://vault-0.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-server-tls/ca.crt"
+          }
+          retry_join {
+            leader_api_addr     = "https://vault-1.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-server-tls/ca.crt"
+          }
+          retry_join {
+            leader_api_addr     = "https://vault-2.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-server-tls/ca.crt"
+          }
+        }
+
+        # No `seal` stanza -> defaults to Shamir. There is no cloud KMS account
+        # available for this cluster today (see documentation/bootstrap-and-unseal.md).
+        # To move to auto-unseal later, add a `seal "awskms" {}` / `seal "gcpckms" {}`
+        # block here and follow Vault's seal-migration procedure — do not just add it
+        # and restart, the existing Shamir-sealed keyring must be migrated.
+
+        disable_mlock = true
+        service_registration "kubernetes" {}
+
+    # Disabled at replicas: 1 — the chart computes an effective maxUnavailable of 0
+    # for a single-node cluster (correctly: evicting your only node is never safe),
+    # but that also blocks routine `kubectl drain` for maintenance with no upside.
+    # Re-enable once replicas: 3 — see documentation/scaling-to-ha.md.
+    disruptionBudget:
+      enabled: false
+
+  # Health checks so Kubernetes doesn't route to a sealed/uninitialized pod, but also
+  # doesn't kill it for being sealed (only real inputs: init, then a human unseals).
+  service:
+    enabled: true
+
+ui:
+  enabled: true
+  serviceType: ClusterIP   # deliberately not LoadBalancer/Ingress — see header comment

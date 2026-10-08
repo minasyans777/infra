@@ -1,0 +1,44 @@
+# Self-signed bootstrap Issuer, used only to mint the private Vault CA below.
+# Not used to issue the server certificate directly.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: vault-bootstrap-selfsigned
+  namespace: vault
+spec:
+  selfSigned: {}
+---
+# Private CA for this Vault cluster's Raft/API TLS. Deliberately not the public
+# letsencrypt-prod ClusterIssuer already used elsewhere in this cluster (see
+# gitops/documentation/prerequisites.md) — Vault's listener certs need SANs for
+# internal pod/service DNS names (vault-0.vault-internal, etc.) that a public CA
+# won't issue for, and Vault's API is never exposed outside the cluster (see
+# ../README.md).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: vault-ca
+  namespace: vault
+spec:
+  isCA: true
+  commonName: vault-ca
+  secretName: vault-ca-key-pair
+  duration: 87600h   # 10y — this is a root CA, rotating it means re-issuing every node's cert
+  renewBefore: 720h  # 30d
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: vault-bootstrap-selfsigned
+    kind: Issuer
+    group: cert-manager.io
+---
+# Promote the CA into an Issuer that signs the actual server certificate.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: vault-ca-issuer
+  namespace: vault
+spec:
+  ca:
+    secretName: vault-ca-key-pair

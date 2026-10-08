@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars and adjust if your ESO install differs from the defaults
+# in variables.tf. terraform.tfvars itself is gitignored — none of these values are
+# secret, but keeping the example separate avoids every clone having a stray local
+# override file tracked by accident.
+
+# kv_mount_path                 = "secret"
+# kubernetes_host                = "https://kubernetes.default.svc"
+# eso_service_account_name       = "external-secrets"
+# eso_service_account_namespace  = "external-secrets"

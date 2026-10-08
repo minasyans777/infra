@@ -1,0 +1,19 @@
+# Terraform (matched from repo root too — state ends up there if `terraform`
+# is run without `cd terraform` first, despite the runbook saying to)
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+terraform.tfvars
+
+# Never commit unseal keys / root tokens, however tempting during bootstrap.
+# vault-init.json specifically: that's the literal filename bootstrap-and-unseal.md
+# tells you to redirect `vault operator init` output into.
+*unseal*.json
+*unseal*.txt
+*root-token*
+vault-init.json
+
+# CA cert pulled locally for VAULT_CACERT during bootstrap — not secret (it's a
+# public cert, not the key), but it's a derived/working artifact, not source.
+ca.crt
