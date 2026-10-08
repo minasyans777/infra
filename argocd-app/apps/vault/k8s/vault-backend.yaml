@@ -1,0 +1,22 @@
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: vault-backend
+spec:
+  provider:
+    vault:
+      auth:
+        kubernetes:
+          mountPath: kubernetes
+          role: external-secrets
+          serviceAccountRef:
+            name: external-secrets
+            namespace: external-secrets
+      caProvider:
+        key: ca.crt
+        name: vault-ca-key-pair
+        namespace: vault
+        type: Secret
+      path: secret
+      server: https://vault-active.vault.svc.cluster.local:8200
+      version: v2

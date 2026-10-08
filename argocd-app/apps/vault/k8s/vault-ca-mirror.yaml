@@ -1,0 +1,19 @@
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: vault-ca-mirror
+spec:
+  provider:
+    kubernetes:
+      auth:
+        serviceAccount:
+          name: external-secrets
+          namespace: external-secrets
+      remoteNamespace: vault
+      server:
+        caProvider:
+          key: ca.crt
+          name: kube-root-ca.crt
+          namespace: kube-system
+          type: ConfigMap
+        url: kubernetes.default
