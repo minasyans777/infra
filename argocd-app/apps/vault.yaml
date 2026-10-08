@@ -18,7 +18,7 @@ spec:
     - repoURL: https://github.com/minasyans777/infra.git
       targetRevision: HEAD
       ref: values
-      path: vault/argocd
+      path: argocd-app/apps/vault/argocd/
   destination:
     server: https://kubernetes.default.svc
     namespace: vault
