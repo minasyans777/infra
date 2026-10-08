@@ -1,0 +1,71 @@
+# Keep legacy injector resources out of Vault's sync status. The injector remains
+# disabled in Helm; absent resources are skipped rather than recreated.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-ignore-injector
+  namespace: vault
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vault-ignore-injector
+rules:
+  - apiGroups: [admissionregistration.k8s.io]
+    resources: [mutatingwebhookconfigurations]
+    resourceNames: [vault-agent-injector-cfg]
+    verbs: [get, patch]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [clusterroles]
+    resourceNames: [vault-agent-injector-clusterrole]
+    verbs: [get, patch]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [clusterrolebindings]
+    resourceNames: [vault-agent-injector-binding]
+    verbs: [get, patch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-ignore-injector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vault-ignore-injector
+subjects:
+  - kind: ServiceAccount
+    name: vault-ignore-injector
+    namespace: vault
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-ignore-injector
+  namespace: vault
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 120
+  template:
+    spec:
+      serviceAccountName: vault-ignore-injector
+      restartPolicy: Never
+      containers:
+        - name: annotate
+          image: registry.k8s.io/kubectl:v1.34.1
+          command: [/bin/sh, -ec]
+          args:
+            - |
+              for resource in \
+                mutatingwebhookconfiguration/vault-agent-injector-cfg \
+                clusterrole/vault-agent-injector-clusterrole \
+                clusterrolebinding/vault-agent-injector-binding
+              do
+                existing=$(kubectl get "$resource" --ignore-not-found -o name)
+                if [ -n "$existing" ]; then
+                  kubectl annotate "$resource" \
+                    argocd.argoproj.io/compare-options=IgnoreExtraneous --overwrite
+                fi
+              done
