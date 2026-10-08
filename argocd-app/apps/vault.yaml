@@ -1,0 +1,23 @@
+# Apply this Application after the Vault namespace and TLS certificate exist.
+# The existing values file remains the single source of Helm configuration.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://helm.releases.hashicorp.com
+      chart: vault
+      targetRevision: 0.34.1
+      helm:
+        releaseName: vault
+        valueFiles:
+          - $values/argocd-app/apps/vault/helm/values/vault.yaml
+    - repoURL: https://github.com/minasyans777/infra.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
