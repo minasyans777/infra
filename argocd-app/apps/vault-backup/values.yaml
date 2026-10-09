@@ -1,0 +1,23 @@
+vault:
+  namespace: vault
+  addr: https://vault-active.vault.svc.cluster.local:8200
+  image: hashicorp/vault:2.0.3
+
+  caSecretName: vault-server-tls
+  caSecretKey: ca.crt
+
+  #   vault policy write vault-snapshot - <<EOF
+  #   path "sys/storage/raft/snapshot" {
+  #     capabilities = ["read"]
+  #   }
+  #   EOF
+  #   vault token create -policy=vault-snapshot -period=768h
+
+  tokenSecretName: vault-backup-token
+  tokenSecretKey: token
+
+backup:
+  # Standard 5-field cron (min hour dom month dow) — daily at 03:00.
+  schedule: "0 3 * * *"
+  retentionDays: 30
+  size: 5Gi

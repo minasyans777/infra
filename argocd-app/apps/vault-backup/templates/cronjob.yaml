@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vault-backup
+  namespace: {{ .Values.vault.namespace }}
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: vault-backup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: raft-snapshot
+              image: {{ .Values.vault.image }}
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  file="/backup/vault-$(date +%Y%m%d%H%M%S).snap"
+                  vault operator raft snapshot save "$file"
+                  find /backup -name '*.snap' -mtime +{{ .Values.backup.retentionDays }} -delete
+              env:
+                - name: VAULT_ADDR
+                  value: {{ .Values.vault.addr | quote }}
+                - name: VAULT_CACERT
+                  value: /vault/tls/{{ .Values.vault.caSecretKey }}
+                - name: VAULT_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.vault.tokenSecretName }}
+                      key: {{ .Values.vault.tokenSecretKey }}
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+                - name: ca
+                  mountPath: /vault/tls
+                  readOnly: true
+          volumes:
+            - name: backup
+              persistentVolumeClaim:
+                claimName: vault-backup
+            - name: ca
+              secret:
+                secretName: {{ .Values.vault.caSecretName }}

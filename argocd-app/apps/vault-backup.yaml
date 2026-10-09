@@ -1,0 +1,18 @@
+# Apply this Application after the Vault namespace, TLS certificate, and backup token exist.
+# The chart's values.yaml remains the single source of Helm configuration.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault-backup
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/minasyans777/infra.git
+    targetRevision: HEAD
+    path: argocd-app/apps/vault-backup
+    helm:
+      releaseName: vault-backup
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: vault
