@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Run stage 1 over authenticated SSH; keep join credentials out of Terraform."""
+"""Run bootstrap or Longhorn over SSH; keep credentials out of Terraform."""
+import argparse
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,9 @@ import sys
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--longhorn-only", action="store_true")
+    args = parser.parse_args()
     config = json.loads(os.environ["CLUSTER_CONFIG"])
     scripts = Path(__file__).resolve().parent
     control = config["control_plane"]
@@ -27,6 +31,10 @@ def main():
     def script(node, filename, args):
         print(f'{node["name"]}: {filename}', flush=True)
         remote(node, ["bash", "-s", "--", *args], (scripts / filename).read_text())
+
+    if args.longhorn_only:
+        script(control, "install-longhorn.sh", [config["longhorn_chart_version"]])
+        return
 
     for node in nodes:
         script(node, "prepare-node.sh", [node["ip"], node["name"], config["kubernetes_version"]])

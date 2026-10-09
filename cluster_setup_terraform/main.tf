@@ -18,6 +18,7 @@ resource "terraform_data" "cluster" {
     configuration = sha256(jsonencode(local.configuration))
     scripts = sha256(join("", [
       for script in sort(tolist(fileset(path.module, "scripts/*"))) : filesha256("${path.module}/${script}")
+      if script != "scripts/install-longhorn.sh"
     ]))
   }
 

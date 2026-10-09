@@ -56,6 +56,16 @@ variable "cilium_version" {
   }
 }
 
+variable "longhorn_chart_version" {
+  description = "Longhorn Helm chart version, matching cluster-bootstrap."
+  type        = string
+  default     = "1.7.2"
+  validation {
+    condition     = can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+$", var.longhorn_chart_version))
+    error_message = "Use a Longhorn chart version such as 1.7.2."
+  }
+}
+
 variable "pod_network_cidr" {
   type    = string
   default = "10.244.0.0/16"

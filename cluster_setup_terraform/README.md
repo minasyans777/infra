@@ -1,9 +1,10 @@
-# Stage 1: Kubernetes bootstrap
+# Kubernetes bootstrap and Longhorn
 
 This Terraform root replaces the Ansible stage-1 workflow on existing Ubuntu
 24.04 servers: host prerequisites, containerd, Kubernetes packages, one kubeadm
 control plane, Cilium, worker joins, and a final node-readiness check. It does not
-create servers or install the stage-2 add-ons.
+create servers. After bootstrap, a separate Terraform resource installs Longhorn;
+other stage-2 add-ons are not included.
 
 ## Requirements
 
@@ -19,7 +20,8 @@ create servers or install the stage-2 add-ons.
   the host network or other routed networks.
 
 The versions default to the existing Ansible values (Kubernetes track `1.36`,
-Cilium `1.17.1`). Confirm that the track is published and that the selected Cilium
+Cilium `1.17.1`). Longhorn defaults to chart `1.7.2`, matching
+`~/hub/cluster-bootstrap/terraform/longhorn.tf`. Confirm that the track is published and that the selected Cilium
 version supports your Kubernetes version before applying. These defaults preserve
 configuration parity; they are not a compatibility certification.
 
@@ -76,8 +78,33 @@ For a non-root SSH user, use `sudo -n cat /etc/kubernetes/admin.conf` as the rem
 command. Adjust key and port to match your configuration. Use a new destination
 path to avoid overwriting another cluster's credentials. This file grants cluster
 administrator access; keep it private. It is downloaded explicitly rather than
-stored in Terraform state. Stage 2, if desired later, is a separate apply in
-`../terraform/` with this kubeconfig path.
+stored in Terraform state. Other add-ons can use this kubeconfig in a separate
+Terraform root.
+
+## Longhorn
+
+`terraform_data.longhorn` runs after `terraform_data.cluster` completes. It uses
+the existing SSH runner and Helm on the control plane with
+`/etc/kubernetes/admin.conf`; no local kubeconfig or additional provider is needed.
+The release is named `longhorn` in `longhorn-system`, with namespace creation,
+`persistence.defaultClass=true`, and `persistence.defaultClassReplicaCount=2`.
+These settings match the source configuration (whose README incorrectly says
+three replicas). The Helm command waits for readiness with a 900-second timeout.
+Node preparation already installs `open-iscsi` and enables `iscsid` on every host.
+
+Set `longhorn_chart_version` to change the chart version. Terraform reruns the
+Longhorn installation when its script, chart version, or cluster bootstrap record
+changes. Changing only the Longhorn script or version does not rerun host bootstrap.
+As with bootstrap, unchanged applies do not detect Helm or Kubernetes drift. To
+reconcile the release explicitly:
+
+```bash
+terraform apply -replace=terraform_data.longhorn
+```
+
+Destroying this resource removes only its Terraform record; it does not uninstall
+Longhorn or delete volumes. If Longhorn is already managed by another Terraform
+root, retire that root's management of the release before applying here.
 
 ## Repeat runs, recovery, and limits
 
@@ -117,7 +144,7 @@ rules already cover them).
 terraform fmt -check
 terraform init -backend=false
 terraform validate
-bash -n scripts/prepare-node.sh scripts/bootstrap-control-plane.sh scripts/verify-cluster.sh
+bash -n scripts/prepare-node.sh scripts/bootstrap-control-plane.sh scripts/verify-cluster.sh scripts/install-longhorn.sh
 ```
 
 These checks do not deploy a cluster. A real deployment is required to validate
