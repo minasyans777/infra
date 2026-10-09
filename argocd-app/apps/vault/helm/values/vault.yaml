@@ -105,7 +105,7 @@ server:
 
   ha:
     enabled: true
-    replicas: 1   # bump to 3 once the 2 worker nodes exist — see documentation/scaling-to-ha.md
+    replicas: 3   # bump to 3 once the 2 worker nodes exist — see documentation/scaling-to-ha.md
     raft:
       enabled: true
       setNodeId: true
@@ -155,7 +155,8 @@ server:
     # but that also blocks routine `kubectl drain` for maintenance with no upside.
     # Re-enable once replicas: 3 — see documentation/scaling-to-ha.md.
     disruptionBudget:
-      enabled: false
+      enabled: true
+      maxUnavailable: 1
 
   # Health checks so Kubernetes doesn't route to a sealed/uninitialized pod, but also
   # doesn't kill it for being sealed (only real inputs: init, then a human unseals).
