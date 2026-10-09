@@ -15,7 +15,7 @@ def main():
     nodes = [control, *config["workers"]]
 
     def remote(node, command, stdin=None, capture=False):
-        ssh = ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes",
+        ssh = ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no",
                "-o", "ConnectTimeout=30", "-i", config["ssh_private_key_file"],
                "-p", str(config["ssh_port"]),
                f'{config["ssh_user"]}@{node["ip"]}']
